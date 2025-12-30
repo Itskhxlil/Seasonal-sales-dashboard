@@ -1,0 +1,13 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 40px;
+}
+
+h2 {
+  color: #0880dc;
+}
+
+#result {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
