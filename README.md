@@ -1,0 +1,1 @@
+Data analysis dashboard for seasonal sales.
