@@ -1,11 +1,25 @@
-let chart = null;
-let chartType = "bar";
+// Dashboard object to encapsulate state and methods
+const SalesDashboard = {
+  chart: null,
+  chartType: "bar",
+  data: null, // Cache data to avoid unnecessary fetches
 
-function loadChart() {
-  $.getJSON("data.php", function (data) {
+  // Fetch data from server
+  fetchData: function(callback) {
+    $.getJSON("data.php")
+      .done(function(data) {
+        SalesDashboard.data = data;
+        callback(data);
+      })
+      .fail(function() {
+        alert("Error loading data. Please try again.");
+      });
+  },
 
-    let labels = [];
-    let sales = [];
+  // Process data to extract labels, sales, and KPIs
+  processData: function(data) {
+    const labels = [];
+    const sales = [];
     let total = 0;
     let bestValue = 0;
     let bestMonth = "";
@@ -21,45 +35,83 @@ function loadChart() {
       }
     });
 
-    $("#totalSales").text(total.toFixed(2));
-    $("#avgSales").text((total / sales.length).toFixed(2));
-    $("#bestMonth").text(bestMonth);
+    return {
+      labels: labels,
+      sales: sales,
+      total: total.toFixed(2),
+      average: (total / sales.length).toFixed(2),
+      bestMonth: bestMonth
+    };
+  },
 
-    // 🔥 المهم جدًا
-    if (chart !== null) {
-      chart.destroy();
+  // Update KPI displays
+  updateKPIs: function(kpis) {
+    $("#totalSales").text(kpis.total);
+    $("#avgSales").text(kpis.average);
+    $("#bestMonth").text(kpis.bestMonth);
+  },
+
+  // Render or update the chart
+  renderChart: function(processedData) {
+    if (this.chart !== null) {
+      this.chart.destroy();
     }
 
-    chart = new Chart(document.getElementById("salesChart"), {
-      type: chartType,
+    this.chart = new Chart(document.getElementById("salesChart"), {
+      type: this.chartType,
       data: {
-        labels: labels,
+        labels: processedData.labels,
         datasets: [{
           label: "Monthly Sales",
-          data: sales,
-          backgroundColor: "rgba(54, 162, 235, 0.6)"
+          data: processedData.sales,
+          backgroundColor: "rgba(54, 162, 235, 0.6)",
+          borderColor: "rgba(54, 162, 235, 1)",
+          borderWidth: 1
         }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
       }
     });
-  });
-}
+  },
 
-$(document).ready(function () {
+  // Load and display chart
+  loadChart: function(forceRefresh = false) {
+    const callback = (data) => {
+      const processed = this.processData(data);
+      this.updateKPIs(processed);
+      this.renderChart(processed);
+    };
 
-  loadChart();
+    if (forceRefresh || !this.data) {
+      this.fetchData(callback);
+    } else {
+      callback(this.data);
+    }
+  },
 
-  $("#btnBar").click(function () {
-    chartType = "bar";
-    loadChart();
-  });
+  // Change chart type
+  setChartType: function(type) {
+    this.chartType = type;
+    this.loadChart();
+  },
 
-  $("#btnLine").click(function () {
-    chartType = "line";
-    loadChart();
-  });
+  // Initialize dashboard
+  init: function() {
+    this.loadChart();
 
-  $("#btnRefresh").click(function () {
-    loadChart();
-  });
+    $("#btnBar").click(() => this.setChartType("bar"));
+    $("#btnLine").click(() => this.setChartType("line"));
+    $("#btnRefresh").click(() => this.loadChart(true));
+  }
+};
 
+// Initialize on document ready
+$(document).ready(function() {
+  SalesDashboard.init();
 });
