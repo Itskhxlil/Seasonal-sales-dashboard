@@ -79,6 +79,11 @@ class SalesDashboard {
       options: {
         responsive: true,
         plugins: {
+          legend: {
+            labels: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color')
+            }
+          },
           tooltip: {
             callbacks: {
               label: function(context) {
@@ -88,12 +93,24 @@ class SalesDashboard {
           }
         },
         scales: {
+          x: {
+            ticks: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color')
+            },
+            grid: {
+              color: getComputedStyle(document.body).getPropertyValue('--table-border')
+            }
+          },
           y: {
             beginAtZero: true,
             ticks: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color'),
               callback: function(value) {
                 return "$" + value;
               }
+            },
+            grid: {
+              color: getComputedStyle(document.body).getPropertyValue('--table-border')
             }
           }
         }
@@ -202,7 +219,57 @@ class Navigation {
   }
 }
 
+// Dark Mode Functionality
+document.addEventListener('DOMContentLoaded', function() {
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  const body = document.body;
+
+  // Check for saved dark mode preference
+  const darkMode = localStorage.getItem('darkMode');
+  if (darkMode === 'enabled') {
+    body.classList.add('dark');
+    darkModeToggle.textContent = '☀️ Light Mode';
+  }
+
+  // Toggle dark mode on button click
+  darkModeToggle.addEventListener('click', function() {
+    body.classList.toggle('dark');
+
+    if (body.classList.contains('dark')) {
+      localStorage.setItem('darkMode', 'enabled');
+      darkModeToggle.textContent = '☀️ Light Mode';
+      updateChartColors(true); // Update charts for dark mode
+    } else {
+      localStorage.setItem('darkMode', 'disabled');
+      darkModeToggle.textContent = '🌙 Dark Mode';
+      updateChartColors(false); // Update charts for light mode
+    }
+  });
+
+  // Function to update chart colors based on mode
+  function updateChartColors(isDark) {
+    // Get the dashboard instance and update chart if it exists
+    if (window.salesDashboard && window.salesDashboard.chart) {
+      const textColor = isDark ? '#e0e0e0' : '#2c3e50';
+      const gridColor = isDark ? '#404040' : '#ecf0f1';
+
+      window.salesDashboard.chart.options.plugins.legend.labels.color = textColor;
+      window.salesDashboard.chart.options.scales.x.ticks.color = textColor;
+      window.salesDashboard.chart.options.scales.y.ticks.color = textColor;
+      window.salesDashboard.chart.options.scales.x.grid.color = gridColor;
+      window.salesDashboard.chart.options.scales.y.grid.color = gridColor;
+
+      window.salesDashboard.chart.update();
+    }
+  }
+
+  // Apply initial chart colors based on current mode
+  updateChartColors(body.classList.contains('dark'));
+});
+
 $(document).ready(() => {
-  new SalesDashboard().init();
+  // Store dashboard instance globally for dark mode access
+  window.salesDashboard = new SalesDashboard();
+  window.salesDashboard.init();
   new Navigation();
 });

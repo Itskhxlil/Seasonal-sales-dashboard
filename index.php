@@ -37,8 +37,13 @@
     <main class="main-content">
       <header class="header">
         <div class="header-content">
-          <h1>Sales Analytics Dashboard</h1>
-          <p>Monitor your sales performance with real-time data and insights.</p>
+          <div class="header-left">
+            <h1>Sales Analytics Dashboard</h1>
+            <p>Monitor your sales performance with real-time data and insights.</p>
+          </div>
+          <div class="header-right">
+            <button id="darkModeToggle" class="dark-mode-btn">🌙 Dark Mode</button>
+          </div>
         </div>
       </header>
 
