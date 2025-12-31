@@ -133,19 +133,57 @@ class SalesDashboard {
 class Navigation {
   constructor() {
     this.currentSection = 'dashboard';
+    this.isMobile = window.innerWidth <= 768;
     this.init();
   }
 
   init() {
+    // Add hamburger menu for mobile
+    if (this.isMobile) {
+      this.addHamburgerMenu();
+    }
+
     // Set up sidebar click handlers
     $('.sidebar-nav a').on('click', (e) => {
       e.preventDefault();
       const section = $(e.currentTarget).data('section');
       this.showSection(section);
+
+      // Close sidebar on mobile after selection
+      if (this.isMobile) {
+        this.toggleSidebar(false);
+      }
     });
 
     // Show default section
     this.showSection(this.currentSection);
+  }
+
+  addHamburgerMenu() {
+    // Create hamburger button
+    const hamburger = $('<button>', {
+      class: 'hamburger-btn',
+      html: '☰',
+      click: () => this.toggleSidebar()
+    });
+
+    // Add to header
+    $('.header-content').prepend(hamburger);
+  }
+
+  toggleSidebar(show = null) {
+    const sidebar = $('.sidebar');
+    const isVisible = sidebar.hasClass('sidebar-open');
+
+    if (show === null) {
+      show = !isVisible;
+    }
+
+    if (show) {
+      sidebar.addClass('sidebar-open');
+    } else {
+      sidebar.removeClass('sidebar-open');
+    }
   }
 
   showSection(sectionName) {
