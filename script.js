@@ -1,61 +1,42 @@
-// Dashboard object to encapsulate state and methods
-const SalesDashboard = {
-  chart: null,
-  chartType: "bar",
-  data: null, // Cache data to avoid unnecessary fetches
+class SalesDashboard {
+  constructor() {
+    this.chart = null;
+    this.chartType = "bar";
+    this.data = null;
+  }
 
-  // Fetch data from server
-  fetchData: function(callback) {
+  fetchData(callback) {
     $.getJSON("data.php")
-      .done(function(data) {
-        SalesDashboard.data = data;
+      .done(data => {
+        this.data = data;
         callback(data);
       })
-      .fail(function() {
-        alert("Error loading data. Please try again.");
-      });
-  },
+      .fail(() => alert("Error loading data. Please try again."));
+  }
 
-  // Process data to extract labels, sales, and KPIs
-  processData: function(data) {
-    const labels = [];
-    const sales = [];
-    let total = 0;
-    let bestValue = 0;
-    let bestMonth = "";
-
-    data.forEach(item => {
-      labels.push(item.month);
-      sales.push(item.sales);
-      total += item.sales;
-
-      if (item.sales > bestValue) {
-        bestValue = item.sales;
-        bestMonth = item.month;
-      }
-    });
+  processData(data) {
+    const labels = data.map(item => item.month);
+    const sales = data.map(item => item.sales);
+    const total = sales.reduce((sum, val) => sum + val, 0);
+    const best = data.reduce((best, item) => item.sales > best.sales ? item : best, { sales: 0, month: "" });
 
     return {
-      labels: labels,
-      sales: sales,
+      labels,
+      sales,
       total: total.toFixed(2),
       average: (total / sales.length).toFixed(2),
-      bestMonth: bestMonth
+      bestMonth: best.month
     };
-  },
+  }
 
-  // Update KPI displays
-  updateKPIs: function(kpis) {
+  updateKPIs(kpis) {
     $("#totalSales").text(kpis.total);
     $("#avgSales").text(kpis.average);
     $("#bestMonth").text(kpis.bestMonth);
-  },
+  }
 
-  // Render or update the chart
-  renderChart: function(processedData) {
-    if (this.chart !== null) {
-      this.chart.destroy();
-    }
+  renderChart(processedData) {
+    if (this.chart) this.chart.destroy();
 
     this.chart = new Chart(document.getElementById("salesChart"), {
       type: this.chartType,
@@ -71,47 +52,33 @@ const SalesDashboard = {
       },
       options: {
         responsive: true,
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
+        scales: { y: { beginAtZero: true } }
       }
     });
-  },
+  }
 
-  // Load and display chart
-  loadChart: function(forceRefresh = false) {
-    const callback = (data) => {
+  loadChart(forceRefresh = false) {
+    const callback = data => {
       const processed = this.processData(data);
       this.updateKPIs(processed);
       this.renderChart(processed);
     };
 
-    if (forceRefresh || !this.data) {
-      this.fetchData(callback);
-    } else {
-      callback(this.data);
-    }
-  },
+    if (forceRefresh || !this.data) this.fetchData(callback);
+    else callback(this.data);
+  }
 
-  // Change chart type
-  setChartType: function(type) {
+  setChartType(type) {
     this.chartType = type;
     this.loadChart();
-  },
+  }
 
-  // Initialize dashboard
-  init: function() {
+  init() {
     this.loadChart();
-
     $("#btnBar").click(() => this.setChartType("bar"));
     $("#btnLine").click(() => this.setChartType("line"));
     $("#btnRefresh").click(() => this.loadChart(true));
   }
-};
+}
 
-// Initialize on document ready
-$(document).ready(function() {
-  SalesDashboard.init();
-});
+$(document).ready(() => new SalesDashboard().init());
