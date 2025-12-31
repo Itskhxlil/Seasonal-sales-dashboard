@@ -20,9 +20,18 @@ class SalesDashboard {
     const total = sales.reduce((sum, val) => sum + val, 0);
     const best = data.reduce((best, item) => item.sales > best.sales ? item : best, { sales: 0, month: "" });
 
+    // Calculate growth percentages
+    const growth = sales.map((sale, index) => {
+      if (index === 0) return "-";
+      const prev = sales[index - 1];
+      const change = ((sale - prev) / prev * 100).toFixed(1);
+      return change + "%";
+    });
+
     return {
       labels,
       sales,
+      growth,
       total: total.toFixed(2),
       average: (total / sales.length).toFixed(2),
       bestMonth: best.month
@@ -30,9 +39,25 @@ class SalesDashboard {
   }
 
   updateKPIs(kpis) {
-    $("#totalSales").text(kpis.total);
-    $("#avgSales").text(kpis.average);
+    $("#totalSales").text("$" + kpis.total);
+    $("#avgSales").text("$" + kpis.average);
     $("#bestMonth").text(kpis.bestMonth);
+  }
+
+  updateTable(processedData) {
+    const tbody = $("#salesTable tbody");
+    tbody.empty(); // Clear existing rows
+
+    // Show last 5 months or all if less
+    const startIndex = Math.max(0, processedData.labels.length - 5);
+    for (let i = startIndex; i < processedData.labels.length; i++) {
+      const row = `<tr>
+        <td>${processedData.labels[i]}</td>
+        <td>$${processedData.sales[i].toFixed(2)}</td>
+        <td>${processedData.growth[i]}</td>
+      </tr>`;
+      tbody.append(row);
+    }
   }
 
   renderChart(processedData) {
@@ -43,16 +68,35 @@ class SalesDashboard {
       data: {
         labels: processedData.labels,
         datasets: [{
-          label: "Monthly Sales",
+          label: "Monthly Sales ($)",
           data: processedData.sales,
-          backgroundColor: "rgba(54, 162, 235, 0.6)",
-          borderColor: "rgba(54, 162, 235, 1)",
-          borderWidth: 1
+          backgroundColor: "rgba(102, 126, 234, 0.6)",
+          borderColor: "rgba(102, 126, 234, 1)",
+          borderWidth: 2,
+          fill: this.chartType === "line"
         }]
       },
       options: {
         responsive: true,
-        scales: { y: { beginAtZero: true } }
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return "Sales: $" + context.parsed.y.toFixed(2);
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return "$" + value;
+              }
+            }
+          }
+        }
       }
     });
   }
@@ -61,6 +105,7 @@ class SalesDashboard {
     const callback = data => {
       const processed = this.processData(data);
       this.updateKPIs(processed);
+      this.updateTable(processed);
       this.renderChart(processed);
     };
 
@@ -70,6 +115,10 @@ class SalesDashboard {
 
   setChartType(type) {
     this.chartType = type;
+    // Update button active states
+    $(".btn-chart").removeClass("active");
+    if (type === "bar") $("#btnBar").addClass("active");
+    else $("#btnLine").addClass("active");
     this.loadChart();
   }
 
@@ -81,4 +130,41 @@ class SalesDashboard {
   }
 }
 
-$(document).ready(() => new SalesDashboard().init());
+class Navigation {
+  constructor() {
+    this.currentSection = 'dashboard';
+    this.init();
+  }
+
+  init() {
+    // Set up sidebar click handlers
+    $('.sidebar-nav a').on('click', (e) => {
+      e.preventDefault();
+      const section = $(e.currentTarget).data('section');
+      this.showSection(section);
+    });
+
+    // Show default section
+    this.showSection(this.currentSection);
+  }
+
+  showSection(sectionName) {
+    // Hide all sections
+    $('.section').hide();
+
+    // Show selected section
+    $(`[data-section="${sectionName}"]`).show();
+
+    // Update active state in sidebar
+    $('.sidebar-nav li').removeClass('active');
+    $(`.sidebar-nav a[data-section="${sectionName}"]`).parent().addClass('active');
+
+    // Update current section
+    this.currentSection = sectionName;
+  }
+}
+
+$(document).ready(() => {
+  new SalesDashboard().init();
+  new Navigation();
+});
