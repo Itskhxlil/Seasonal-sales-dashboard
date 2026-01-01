@@ -1,17 +1,56 @@
 <?php
-$filename = __DIR__ . "/data/sales.csv";
-$data = [];
+$dataset = isset($_GET['dataset']) ? $_GET['dataset'] : '';
 
-if (($handle = fopen($filename, "r")) !== false) {
-    fgetcsv($handle); // skip header
-    while (($row = fgetcsv($handle)) !== false) {
-        $month = date("F", strtotime($row[10]));
-        $data[$month] = ($data[$month] ?? 0) + (float)$row[9];
+if (empty($dataset) || !preg_match('/^sales\d+$/', $dataset)) {
+    // No dataset selected or invalid format, return empty data
+    $result = [];
+} else {
+    $filename = __DIR__ . "/data/{$dataset}.csv";
+
+    if (!file_exists($filename)) {
+        // Dataset file not found, return empty data
+        $result = [];
+    } else {
+    $data = [];
+
+    $allMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    foreach ($allMonths as $month) {
+        $data[$month] = 0;
     }
-    fclose($handle);
-}
 
-$result = array_map(fn($month, $sales) => ["month" => $month, "sales" => round($sales, 2)], array_keys($data), $data);
+    $monthIndex = -1;
+    $salesIndex = -1;
+
+    if (($handle = fopen($filename, "r")) !== false) {
+        $header = fgetcsv($handle); // read header
+        if ($header !== false) {
+            foreach ($header as $index => $col) {
+                $col = strtolower(trim($col));
+                if ($col === 'month') {
+                    $monthIndex = $index;
+                } elseif ($col === 'sales') {
+                    $salesIndex = $index;
+                }
+            }
+        }
+
+        if ($monthIndex !== -1 && $salesIndex !== -1) {
+            while (($row = fgetcsv($handle)) !== false) {
+                if (isset($row[$monthIndex]) && isset($row[$salesIndex])) {
+                    $month = trim($row[$monthIndex]);
+                    $sales = (float)$row[$salesIndex];
+                    if (isset($data[$month])) {
+                        $data[$month] += $sales;
+                    }
+                }
+            }
+        }
+        fclose($handle);
+    }
+
+    $result = array_map(fn($month, $sales) => ["month" => $month, "sales" => round($sales, 2)], array_keys($data), $data);
+}
 
 header("Content-Type: application/json");
 echo json_encode($result);

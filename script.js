@@ -1,12 +1,17 @@
 class SalesDashboard {
   constructor() {
     this.chart = null;
+    this.analyticsChart = null;
     this.chartType = "bar";
     this.data = null;
   }
 
-  fetchData(callback) {
-    $.getJSON("data.php")
+  fetchData(callback, dataset = null) {
+    let url = "data.php";
+    if (dataset) {
+      url += "?dataset=" + dataset;
+    }
+    $.getJSON(url)
       .done(data => {
         this.data = data;
         callback(data);
@@ -28,13 +33,17 @@ class SalesDashboard {
       return change + "%";
     });
 
+    // Handle empty data case
+    const average = sales.length === 0 ? "0.00" : (total / sales.length).toFixed(2);
+    const bestMonth = sales.length === 0 ? "-" : best.month;
+
     return {
       labels,
       sales,
       growth,
       total: total.toFixed(2),
-      average: (total / sales.length).toFixed(2),
-      bestMonth: best.month
+      average: average,
+      bestMonth: bestMonth
     };
   }
 
@@ -44,20 +53,120 @@ class SalesDashboard {
     $("#bestMonth").text(kpis.bestMonth);
   }
 
-  updateTable(processedData) {
+  updateTable(processedData, selectedMonth = null) {
     const tbody = $("#salesTable tbody");
     tbody.empty(); // Clear existing rows
 
-    // Show last 5 months or all if less
-    const startIndex = Math.max(0, processedData.labels.length - 5);
-    for (let i = startIndex; i < processedData.labels.length; i++) {
+    const getPerformanceLabel = (growth) => {
+      if (growth === "-" || growth === "N/A") return "N/A";
+      const match = growth.match(/(-?\d+\.?\d*)%/);
+      if (!match) return "N/A";
+      const value = parseFloat(match[1]);
+      if (value < 0) return "Low";
+      if (value <= 10) return "Medium";
+      return "High";
+    };
+
+    if (selectedMonth) {
+      // Show only the selected month
+      const monthIndex = processedData.labels.indexOf(selectedMonth);
+      if (monthIndex !== -1) {
+        const sales = processedData.sales[monthIndex];
+        let growth = processedData.growth[monthIndex];
+        if (monthIndex === 0 || processedData.sales[monthIndex - 1] === 0) {
+          growth = "N/A";
+        }
+        const performance = getPerformanceLabel(growth);
+        const row = `<tr>
+          <td>${selectedMonth}</td>
+          <td>$${sales.toFixed(2)}</td>
+          <td>${growth}</td>
+          <td>${performance}</td>
+        </tr>`;
+        tbody.append(row);
+      }
+    } else {
+      // Show all months
+      for (let i = 0; i < processedData.labels.length; i++) {
+        const growth = processedData.growth[i];
+        const performance = getPerformanceLabel(growth);
+        const row = `<tr>
+          <td>${processedData.labels[i]}</td>
+          <td>$${processedData.sales[i].toFixed(2)}</td>
+          <td>${growth}</td>
+          <td>${performance}</td>
+        </tr>`;
+        tbody.append(row);
+      }
+    }
+  }
+
+  updateSalesDataTable(processedData) {
+    const tbody = $("#salesDataTable tbody");
+    tbody.empty();
+    for (let i = 0; i < processedData.labels.length; i++) {
       const row = `<tr>
         <td>${processedData.labels[i]}</td>
         <td>$${processedData.sales[i].toFixed(2)}</td>
-        <td>${processedData.growth[i]}</td>
       </tr>`;
       tbody.append(row);
     }
+  }
+
+  renderAnalyticsChart(processedData) {
+    const ctx = document.getElementById("analyticsChart");
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: processedData.labels,
+        datasets: [{
+          label: "Monthly Sales ($)",
+          data: processedData.sales,
+          backgroundColor: "rgba(102, 126, 234, 0.2)",
+          borderColor: "rgba(102, 126, 234, 1)",
+          borderWidth: 2,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            labels: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color')
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color')
+            },
+            grid: {
+              color: getComputedStyle(document.body).getPropertyValue('--table-border')
+            }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: getComputedStyle(document.body).getPropertyValue('--text-color'),
+              callback: function(value) {
+                return "$" + value;
+              }
+            },
+            grid: {
+              color: getComputedStyle(document.body).getPropertyValue('--table-border')
+            }
+          }
+        }
+      }
+    });
+  }
+
+  updateReportSummary(processedData) {
+    const summary = `Total Sales: $${processedData.total}<br>Best Month: ${processedData.bestMonth}`;
+    $("#reportSummary").html(summary);
   }
 
   renderChart(processedData) {
@@ -121,13 +230,39 @@ class SalesDashboard {
   loadChart(forceRefresh = false) {
     const callback = data => {
       const processed = this.processData(data);
-      this.updateKPIs(processed);
-      this.updateTable(processed);
-      this.renderChart(processed);
+      if (data && data.length > 0) {
+        // Hide empty state and show dashboard content
+        $("#emptyStateMessage").hide();
+        $(".kpi-container, .chart-card, .table-card").show();
+        this.updateKPIs(processed);
+        this.updateTable(processed);
+        this.renderChart(processed);
+        this.updateSalesDataTable(processed);
+        this.renderAnalyticsChart(processed);
+        this.updateReportSummary(processed);
+        this.populateMonthSelector(processed);
+      } else {
+        // Show empty state and hide dashboard content
+        $("#emptyStateMessage").show();
+        $(".kpi-container, .chart-card, .table-card").hide();
+      }
     };
 
     if (forceRefresh || !this.data) this.fetchData(callback);
     else callback(this.data);
+  }
+
+  populateMonthSelector(processedData) {
+    const selector = $("#monthSelector");
+    selector.empty(); // Clear existing options
+
+    // Add "All Months" option
+    selector.append('<option value="">All Months</option>');
+
+    // Add all available months from data
+    processedData.labels.forEach(month => {
+      selector.append(`<option value="${month}">${month}</option>`);
+    });
   }
 
   setChartType(type) {
@@ -140,10 +275,16 @@ class SalesDashboard {
   }
 
   init() {
-    this.loadChart();
     $("#btnBar").click(() => this.setChartType("bar"));
     $("#btnLine").click(() => this.setChartType("line"));
     $("#btnRefresh").click(() => this.loadChart(true));
+    $("#monthSelector").change((e) => {
+      const selectedMonth = $(e.target).val() || null;
+      if (this.data) {
+        const processed = this.processData(this.data);
+        this.updateTable(processed, selectedMonth);
+      }
+    });
   }
 }
 
@@ -214,6 +355,13 @@ class Navigation {
     $('.sidebar-nav li').removeClass('active');
     $(`.sidebar-nav a[data-section="${sectionName}"]`).parent().addClass('active');
 
+    // Show/hide upload container based on section
+    if (sectionName === 'dashboard') {
+      $('#uploadContainer').show();
+    } else {
+      $('#uploadContainer').hide();
+    }
+
     // Update current section
     this.currentSection = sectionName;
   }
@@ -221,45 +369,53 @@ class Navigation {
 
 // Dark Mode Functionality
 document.addEventListener('DOMContentLoaded', function() {
-  const darkModeToggle = document.getElementById('darkModeToggle');
+  const darkModeCheckbox = document.getElementById('darkModeCheckbox');
   const body = document.body;
 
   // Check for saved dark mode preference
   const darkMode = localStorage.getItem('darkMode');
   if (darkMode === 'enabled') {
     body.classList.add('dark');
-    darkModeToggle.textContent = '☀️ Light Mode';
+    darkModeCheckbox.checked = true;
   }
 
-  // Toggle dark mode on button click
-  darkModeToggle.addEventListener('click', function() {
+  // Toggle dark mode on checkbox change
+  darkModeCheckbox.addEventListener('change', function() {
     body.classList.toggle('dark');
 
     if (body.classList.contains('dark')) {
       localStorage.setItem('darkMode', 'enabled');
-      darkModeToggle.textContent = '☀️ Light Mode';
       updateChartColors(true); // Update charts for dark mode
     } else {
       localStorage.setItem('darkMode', 'disabled');
-      darkModeToggle.textContent = '🌙 Dark Mode';
       updateChartColors(false); // Update charts for light mode
     }
   });
 
   // Function to update chart colors based on mode
   function updateChartColors(isDark) {
-    // Get the dashboard instance and update chart if it exists
-    if (window.salesDashboard && window.salesDashboard.chart) {
+    // Get the dashboard instance and update charts if they exist
+    if (window.salesDashboard) {
       const textColor = isDark ? '#e0e0e0' : '#2c3e50';
       const gridColor = isDark ? '#404040' : '#ecf0f1';
 
-      window.salesDashboard.chart.options.plugins.legend.labels.color = textColor;
-      window.salesDashboard.chart.options.scales.x.ticks.color = textColor;
-      window.salesDashboard.chart.options.scales.y.ticks.color = textColor;
-      window.salesDashboard.chart.options.scales.x.grid.color = gridColor;
-      window.salesDashboard.chart.options.scales.y.grid.color = gridColor;
+      if (window.salesDashboard.chart) {
+        window.salesDashboard.chart.options.plugins.legend.labels.color = textColor;
+        window.salesDashboard.chart.options.scales.x.ticks.color = textColor;
+        window.salesDashboard.chart.options.scales.y.ticks.color = textColor;
+        window.salesDashboard.chart.options.scales.x.grid.color = gridColor;
+        window.salesDashboard.chart.options.scales.y.grid.color = gridColor;
+        window.salesDashboard.chart.update();
+      }
 
-      window.salesDashboard.chart.update();
+      if (window.salesDashboard.analyticsChart) {
+        window.salesDashboard.analyticsChart.options.plugins.legend.labels.color = textColor;
+        window.salesDashboard.analyticsChart.options.scales.x.ticks.color = textColor;
+        window.salesDashboard.analyticsChart.options.scales.y.ticks.color = textColor;
+        window.salesDashboard.analyticsChart.options.scales.x.grid.color = gridColor;
+        window.salesDashboard.analyticsChart.options.scales.y.grid.color = gridColor;
+        window.salesDashboard.analyticsChart.update();
+      }
     }
   }
 
@@ -272,4 +428,19 @@ $(document).ready(() => {
   window.salesDashboard = new SalesDashboard();
   window.salesDashboard.init();
   new Navigation();
+
+  // Handle dataset selector change
+  $("#datasetSelector").change((e) => {
+    const selectedDataset = $(e.target).val();
+    if (selectedDataset) {
+      window.salesDashboard.fetchData((data) => {
+        window.salesDashboard.loadChart(true);
+      }, selectedDataset);
+    } else {
+      // No dataset selected, show empty state
+      $("#emptyStateMessage").show();
+      $(".kpi-container, .chart-card, .table-card").hide();
+      window.salesDashboard.data = null;
+    }
+  });
 });

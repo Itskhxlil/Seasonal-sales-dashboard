@@ -41,9 +41,7 @@
             <h1>Sales Analytics Dashboard</h1>
             <p>Monitor your sales performance with real-time data and insights.</p>
           </div>
-          <div class="header-right">
-            <button id="darkModeToggle" class="dark-mode-btn">🌙 Dark Mode</button>
-          </div>
+
         </div>
       </header>
 
@@ -53,6 +51,25 @@
           <div class="section-header">
             <h2>Dashboard Overview</h2>
             <p>Main dashboard with key metrics and charts.</p>
+            <div class="dataset-selector">
+              <label for="datasetSelector">Select Dataset:</label>
+              <select id="datasetSelector">
+                <option value="">Choose Dataset</option>
+                <?php
+                $dataDir = __DIR__ . '/data';
+                if (is_dir($dataDir)) {
+                  $files = glob($dataDir . '/sales*.csv');
+                  foreach ($files as $file) {
+                    $filename = basename($file, '.csv');
+                    echo '<option value="' . htmlspecialchars($filename) . '">' . htmlspecialchars($filename) . '</option>';
+                  }
+                }
+                ?>
+              </select>
+            </div>
+          </div>
+          <div id="emptyStateMessage" class="empty-state" style="display: block;">
+            <p>Please select a dataset to view data</p>
           </div>
           <div class="kpi-container">
             <div class="kpi-card">
@@ -95,12 +112,19 @@
 
           <div class="table-card">
             <h3>Recent Sales Summary</h3>
+            <div class="table-controls">
+              <label for="monthSelector">Select Month:</label>
+              <select id="monthSelector">
+                <option value="">All Months</option>
+              </select>
+            </div>
             <table id="salesTable">
               <thead>
                 <tr>
                   <th>Month</th>
                   <th>Sales ($)</th>
                   <th>Growth</th>
+                  <th>Performance</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,10 +140,19 @@
             <h2>Sales Management</h2>
             <p>Manage and track sales transactions.</p>
           </div>
-          <div class="card">
+          <div class="table-card">
             <h3>Sales Data</h3>
-            <p>View and manage sales records here.</p>
-            <p><em>Feature under development</em></p>
+            <table id="salesDataTable">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Sales ($)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Table rows will be populated by JS -->
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -129,10 +162,9 @@
             <h2>Advanced Analytics</h2>
             <p>Detailed analysis and insights from sales data.</p>
           </div>
-          <div class="card">
-            <h3>Analytics Tools</h3>
-            <p>Advanced charts and reports for deeper insights.</p>
-            <p><em>Feature under development</em></p>
+          <div class="chart-card">
+            <h3>Sales Analytics Chart</h3>
+            <canvas id="analyticsChart"></canvas>
           </div>
         </section>
 
@@ -143,9 +175,8 @@
             <p>Generate and download sales reports.</p>
           </div>
           <div class="card">
-            <h3>Report Generator</h3>
-            <p>Create custom reports from your sales data.</p>
-            <p><em>Feature under development</em></p>
+            <h3>Sales Summary</h3>
+            <div id="reportSummary"></div>
           </div>
         </section>
 
@@ -157,8 +188,10 @@
           </div>
           <div class="card">
             <h3>Dashboard Settings</h3>
-            <p>Customize your dashboard experience.</p>
-            <p><em>Feature under development</em></p>
+            <div class="setting-item">
+              <label for="darkModeCheckbox" class="setting-label">Dark Mode</label>
+              <input type="checkbox" id="darkModeCheckbox" class="setting-checkbox">
+            </div>
           </div>
         </section>
       </div>
